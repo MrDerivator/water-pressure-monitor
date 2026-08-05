@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Water Pressure Monitor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#0b1622; --panel:#101e2e; --line:#1d3349; --line2:#27425e;
+    --text:#d7e3ee; --dim:#7b91a6; --aqua:#39d6e8; --aqua-dim:#1b6b75;
+    --amber:#f0a641; --red:#e5484d; --green:#3fcf8e;
+    --mono:ui-monospace,'SF Mono','Cascadia Mono','JetBrains Mono',Consolas,monospace;
+    --sans:'Segoe UI',system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--ink);color:var(--text);font-family:var(--sans);min-height:100vh}
+  a{color:var(--aqua)}
+  button{font-family:inherit;cursor:pointer}
+
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--line)}
+  header h1{font-size:15px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  header h1 b{color:var(--text)}
+  .hbtns{display:flex;gap:8px}
+  .ghost{background:none;border:1px solid var(--line2);color:var(--dim);border-radius:6px;padding:6px 12px;font-size:12px}
+  .ghost:hover{color:var(--text);border-color:var(--aqua-dim)}
+
+  main{max-width:1060px;margin:0 auto;padding:22px;display:grid;gap:18px}
+
+  /* ---- current reading: arc gauge signature ---- */
+  .now{display:flex;gap:26px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 26px;flex-wrap:wrap}
+  .gauge{position:relative;width:190px;height:120px;flex:none}
+  .gauge svg{width:100%;height:100%}
+  .reading{flex:1;min-width:220px}
+  .reading .val{font-family:var(--mono);font-size:58px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+  .reading .val small{font-size:20px;color:var(--dim);font-weight:400;margin-left:6px}
+  .reading .sub{margin-top:8px;color:var(--dim);font-size:13px;display:flex;align-items:center;gap:8px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--dim);flex:none}
+  .dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .dot.off{background:var(--red);box-shadow:0 0 8px var(--red)}
+  .thresh{font-size:12px;color:var(--dim);border-left:1px solid var(--line2);padding-left:20px;line-height:2}
+  .thresh b{color:var(--text);font-family:var(--mono)}
+
+  /* ---- history panel ---- */
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px}
+  .ph{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .ph h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:600}
+  .tabs{display:flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden}
+  .tabs button{background:none;border:none;color:var(--dim);padding:7px 16px;font-size:13px}
+  .tabs button.active{background:var(--aqua-dim);color:#eafcff}
+  .nav{display:flex;align-items:center;gap:6px}
+  .nav button{background:none;border:1px solid var(--line2);color:var(--dim);width:30px;height:30px;border-radius:6px;font-size:14px}
+  .nav .label{font-family:var(--mono);font-size:13px;min-width:130px;text-align:center;color:var(--text)}
+  .chartwrap{position:relative;height:340px}
+  .empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px}
+
+  /* ---- alerts ---- */
+  .alerts li{list-style:none;display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px;align-items:baseline}
+  .alerts li:last-child{border-bottom:none}
+  .badge{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:4px;flex:none}
+  .badge.LOW_PRESSURE{background:#3c1518;color:var(--red)}
+  .badge.SUDDEN_DROP{background:#3a2a10;color:var(--amber)}
+  .badge.OFFLINE{background:#1c2733;color:var(--dim)}
+  .alerts .when{color:var(--dim);font-family:var(--mono);font-size:11px;margin-left:auto;flex:none}
+  .alerts .resolved{color:var(--green);font-size:11px;flex:none}
+
+  /* ---- settings dialog ---- */
+  dialog{background:var(--panel);color:var(--text);border:1px solid var(--line2);border-radius:12px;padding:24px;width:min(520px,92vw)}
+  dialog::backdrop{background:rgba(4,10,16,.7)}
+  dialog h2{font-size:14px;margin-bottom:16px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+  .field label{font-size:11px;color:var(--dim);letter-spacing:.05em}
+  .field input,.field select{background:var(--ink);border:1px solid var(--line2);color:var(--text);border-radius:6px;padding:8px 10px;font-size:13px;font-family:var(--mono)}
+  .field input:focus,.field select:focus{outline:2px solid var(--aqua-dim)}
+  .check{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px}
+  .primary{background:var(--aqua-dim);border:none;color:#eafcff;border-radius:7px;padding:9px 18px;font-size:13px;font-weight:600}
+  .primary:hover{background:#23808c}
+  .dlg-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+  .sectionrule{border:none;border-top:1px solid var(--line);margin:14px 0}
+
+  /* ---- login ---- */
+  #login{position:fixed;inset:0;background:var(--ink);display:flex;align-items:center;justify-content:center;z-index:10}
+  #login form{background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:34px;width:min(360px,90vw);display:flex;flex-direction:column;gap:14px}
+  #login h1{font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);text-align:center}
+  #login input{background:var(--ink);border:1px solid var(--line2);color:var(--text);border-radius:7px;padding:11px 12px;font-size:14px}
+  #loginErr{color:var(--red);font-size:12px;min-height:14px;text-align:center}
+
+  @media (max-width:640px){
+    .reading .val{font-size:44px}
+    .thresh{border-left:none;padding-left:0}
+  }
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important;animation:none !important} }
+</style>
+</head>
+<body>
+
+<div id="login" hidden>
+  <form id="loginForm">
+    <h1>Water Pressure Monitor</h1>
+    <input type="password" id="password" placeholder="Password" autocomplete="current-password" autofocus>
+    <div id="loginErr"></div>
+    <button class="primary" type="submit">Sign in</button>
+  </form>
+</div>
+
+<header>
+  <h1><b>Pressure</b> · main water line</h1>
+  <div class="hbtns">
+    <button class="ghost" id="settingsBtn">Settings</button>
+    <button class="ghost" id="logoutBtn">Sign out</button>
+  </div>
+</header>
+
+<main>
+  <section class="now">
+    <div class="gauge">
+      <svg viewBox="0 0 200 120" aria-hidden="true">
+        <path d="M 16 108 A 92 92 0 0 1 184 108" fill="none" stroke="var(--line2)" stroke-width="10" stroke-linecap="round"/>
+        <path id="gaugeArc" d="M 16 108 A 92 92 0 0 1 184 108" fill="none" stroke="var(--aqua)" stroke-width="10"
+              stroke-linecap="round" stroke-dasharray="289" stroke-dashoffset="289"/>
+        <line id="threshTick" x1="0" y1="0" x2="0" y2="0" stroke="var(--red)" stroke-width="3"/>
+        <text x="16" y="120" fill="var(--dim)" font-size="9" font-family="var(--mono)">0</text>
+        <text x="170" y="120" fill="var(--dim)" font-size="9" font-family="var(--mono)" id="gaugeMax">174</text>
+      </svg>
+    </div>
+    <div class="reading">
+      <div class="val"><span id="pressureVal">—</span><small id="unitLabel">PSI</small></div>
+      <div class="sub"><span class="dot" id="statusDot"></span><span id="statusText">Loading…</span></div>
+    </div>
+    <div class="thresh" id="threshInfo"></div>
+  </section>
+
+  <section class="panel">
+    <div class="ph">
+      <h2>History</h2>
+      <div class="nav">
+        <button id="prevBtn" aria-label="Previous period">‹</button>
+        <span class="label" id="rangeLabel"></span>
+        <button id="nextBtn" aria-label="Next period">›</button>
+      </div>
+      <div class="tabs" role="tablist">
+        <button data-g="day" class="active">Day</button>
+        <button data-g="month">Month</button>
+        <button data-g="year">Year</button>
+      </div>
+    </div>
+    <div class="chartwrap">
+      <canvas id="chart"></canvas>
+      <div class="empty" id="chartEmpty" hidden>No measurements in this period</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="ph"><h2>Recent alerts</h2></div>
+    <ul class="alerts" id="alertList"><li style="color:var(--dim)">No alerts yet — that's good news.</li></ul>
+  </section>
+</main>
+
+<dialog id="settingsDlg">
+  <h2>Alert settings</h2>
+  <div class="grid2">
+    <div class="field"><label for="sLow">Low pressure threshold (PSI)</label><input id="sLow" type="number" step="0.5"></div>
+    <div class="field"><label for="sDelta">Sudden drop: delta (PSI)</label><input id="sDelta" type="number" step="0.5"></div>
+    <div class="field"><label for="sWindow">Sudden drop: window (min)</label><input id="sWindow" type="number"></div>
+    <div class="field"><label for="sOffline">Offline timeout (min)</label><input id="sOffline" type="number"></div>
+    <div class="field"><label for="sCooldown">Alert cooldown (min)</label><input id="sCooldown" type="number"></div>
+    <div class="field"><label for="sUnit">Display unit</label>
+      <select id="sUnit"><option>PSI</option><option>bar</option><option>kPa</option></select></div>
+  </div>
+  <hr class="sectionrule">
+  <label class="check"><input type="checkbox" id="sTgOn"> Send Telegram alerts</label>
+  <div class="grid2">
+    <div class="field"><label for="sTgToken">Bot token (leave ******** to keep)</label><input id="sTgToken" type="text" autocomplete="off"></div>
+    <div class="field"><label for="sTgChat">Chat ID</label><input id="sTgChat" type="text"></div>
+  </div>
+  <hr class="sectionrule">
+  <label class="check"><input type="checkbox" id="sCompOn"> Compact raw data older than
+    <input id="sCompDays" type="number" style="width:70px;background:var(--ink);border:1px solid var(--line2);color:var(--text);border-radius:6px;padding:4px 6px;font-family:var(--mono)"> days</label>
+  <div class="dlg-actions">
+    <button class="ghost" id="dlgCancel" type="button">Cancel</button>
+    <button class="primary" id="dlgSave" type="button">Save changes</button>
+  </div>
+</dialog>
+
+<script>
+const $ = s => document.querySelector(s);
+const GAUGE_MAX_PSI = 174, ARC_LEN = 289;
+const UNITS = { PSI:{f:1,d:1}, bar:{f:0.0689476,d:2}, kPa:{f:6.89476,d:0} };
+
+let state = { granularity:'day', anchor:new Date(), settings:null, chart:null };
+
+async function api(path, opts={}) {
+  const res = await fetch('/api'+path, {headers:{'Content-Type':'application/json'}, ...opts});
+  if (res.status === 401) { showLogin(); throw new Error('unauthorized'); }
+  if (!res.ok) throw new Error((await res.json().catch(()=>({}))).error || res.statusText);
+  return res.status === 204 ? null : res.json();
+}
+
+/* ---------- auth ---------- */
+function showLogin(){ $('#login').hidden = false; }
+$('#loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  try {
+    await api('/login', {method:'POST', body:JSON.stringify({password:$('#password').value})});
+    $('#login').hidden = true; $('#password').value=''; $('#loginErr').textContent='';
+    boot();
+  } catch { $('#loginErr').textContent = 'Wrong password — try again.'; }
+});
+$('#logoutBtn').addEventListener('click', async () => { await api('/logout',{method:'POST'}).catch(()=>{}); showLogin(); });
+
+/* ---------- unit helpers ---------- */
+function unit(){ return state.settings?.displayUnit || 'PSI'; }
+function conv(psi){ const u=UNITS[unit()]; return (psi*u.f).toFixed(u.d); }
+
+/* ---------- status / gauge ---------- */
+async function refreshStatus(){
+  const st = await api('/status');
+  const psi = st.lastPressurePsi;
+  $('#pressureVal').textContent = psi==null ? '—' : conv(psi);
+  $('#unitLabel').textContent = unit();
+  $('#statusDot').className = 'dot ' + (st.online ? 'on':'off');
+  $('#statusText').textContent = st.lastMeasuredAt
+      ? (st.online?'Online':'Offline') + ' · last reading ' + new Date(st.lastMeasuredAt).toLocaleString()
+      : 'Waiting for first measurement';
+  // arc fill 0..GAUGE_MAX_PSI
+  const frac = psi==null ? 0 : Math.min(Math.max(psi/GAUGE_MAX_PSI,0),1);
+  $('#gaugeArc').style.strokeDashoffset = ARC_LEN * (1-frac);
+  $('#gaugeArc').style.stroke = psi!=null && state.settings && psi < state.settings.lowThresholdPsi ? 'var(--red)' : 'var(--aqua)';
+  // threshold tick position on the arc
+  if (state.settings){
+    const a = Math.PI * (1 - state.settings.lowThresholdPsi/GAUGE_MAX_PSI);
+    const cx=100, cy=108, r1=86, r2=104;
+    $('#threshTick').setAttribute('x1', cx + r1*Math.cos(a));
+    $('#threshTick').setAttribute('y1', cy - r1*Math.sin(a));
+    $('#threshTick').setAttribute('x2', cx + r2*Math.cos(a));
+    $('#threshTick').setAttribute('y2', cy - r2*Math.sin(a));
+    const s = state.settings;
+    $('#threshInfo').innerHTML =
+      `Low alert &lt; <b>${conv(s.lowThresholdPsi)} ${unit()}</b><br>` +
+      `Drop alert &gt; <b>${conv(s.dropDeltaPsi)} ${unit()}</b> / ${s.dropWindowMinutes} min<br>` +
+      `Offline after <b>${s.offlineTimeoutMinutes} min</b>`;
+  }
+}
+
+/* ---------- history chart ---------- */
+function rangeFor(g, d){
+  const s = new Date(d), e = new Date(d);
+  if (g==='day'){ s.setHours(0,0,0,0); e.setTime(s.getTime()); e.setDate(e.getDate()+1); }
+  if (g==='month'){ s.setDate(1); s.setHours(0,0,0,0); e.setTime(s.getTime()); e.setMonth(e.getMonth()+1); }
+  if (g==='year'){ s.setMonth(0,1); s.setHours(0,0,0,0); e.setTime(s.getTime()); e.setFullYear(e.getFullYear()+1); }
+  return [s,e];
+}
+function rangeLabel(g,d){
+  if (g==='day') return d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
+  if (g==='month') return d.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  return d.getFullYear().toString();
+}
+function bucketLabel(g, iso){
+  const d = new Date(iso);
+  if (g==='day') return d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+  if (g==='month') return d.toLocaleDateString(undefined,{day:'numeric',month:'short'});
+  return d.toLocaleDateString(undefined,{month:'short'});
+}
+
+async function refreshChart(){
+  const [from,to] = rangeFor(state.granularity, state.anchor);
+  $('#rangeLabel').textContent = rangeLabel(state.granularity, state.anchor);
+  const data = await api(`/measurements?granularity=${state.granularity}&from=${from.toISOString()}&to=${to.toISOString()}`);
+  const b = data.buckets;
+  $('#chartEmpty').hidden = b.length > 0;
+  const labels = b.map(x=>bucketLabel(state.granularity, x.bucket));
+  const avg = b.map(x=>+conv(x.avg)), min = b.map(x=>+conv(x.min)), max = b.map(x=>+conv(x.max));
+
+  if (state.chart) state.chart.destroy();
+  state.chart = new Chart($('#chart'), {
+    type:'line',
+    data:{ labels, datasets:[
+      { label:'max', data:max, borderWidth:0, pointRadius:0, fill:false, tension:.3 },
+      { label:'min', data:min, borderWidth:0, pointRadius:0, fill:'-1',
+        backgroundColor:'rgba(57,214,232,0.10)', tension:.3 },
+      { label:'avg ('+unit()+')', data:avg, borderColor:'#39d6e8', backgroundColor:'#39d6e8',
+        borderWidth:2, pointRadius: b.length>80?0:2.5, tension:.3 }
+    ]},
+    options:{
+      maintainAspectRatio:false, animation:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label: ctx => ctx.dataset.label==='min' || ctx.dataset.label==='max'
+            ? ctx.dataset.label+': '+ctx.parsed.y+' '+unit()
+            : 'avg: '+ctx.parsed.y+' '+unit() } } },
+      scales:{
+        x:{ grid:{color:'#1d3349'}, ticks:{color:'#7b91a6',maxTicksLimit:14} },
+        y:{ grid:{color:'#1d3349'}, ticks:{color:'#7b91a6'},
+            title:{display:true,text:unit(),color:'#7b91a6'} }
+      }
+    }
+  });
+}
+
+document.querySelectorAll('.tabs button').forEach(btn => btn.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  state.granularity = btn.dataset.g; state.anchor = new Date();
+  refreshChart();
+}));
+function shift(dir){
+  const d = state.anchor;
+  if (state.granularity==='day') d.setDate(d.getDate()+dir);
+  if (state.granularity==='month') d.setMonth(d.getMonth()+dir);
+  if (state.granularity==='year') d.setFullYear(d.getFullYear()+dir);
+  refreshChart();
+}
+$('#prevBtn').addEventListener('click',()=>shift(-1));
+$('#nextBtn').addEventListener('click',()=>shift(1));
+
+/* ---------- alerts ---------- */
+async function refreshAlerts(){
+  const list = await api('/alerts');
+  if (!list.length) return;
+  $('#alertList').innerHTML = list.map(a => `
+    <li>
+      <span class="badge ${a.type}">${a.type.replace('_',' ')}</span>
+      <span>${a.message}</span>
+      ${a.resolvedAt ? '<span class="resolved">resolved</span>' : ''}
+      <span class="when">${new Date(a.firedAt).toLocaleString()}</span>
+    </li>`).join('');
+}
+
+/* ---------- settings ---------- */
+const dlg = $('#settingsDlg');
+$('#settingsBtn').addEventListener('click', () => {
+  const s = state.settings; if (!s) return;
+  $('#sLow').value=s.lowThresholdPsi; $('#sDelta').value=s.dropDeltaPsi;
+  $('#sWindow').value=s.dropWindowMinutes; $('#sOffline').value=s.offlineTimeoutMinutes;
+  $('#sCooldown').value=s.cooldownMinutes; $('#sUnit').value=s.displayUnit;
+  $('#sTgOn').checked=s.telegramEnabled; $('#sTgToken').value=s.telegramBotToken||'';
+  $('#sTgChat').value=s.telegramChatId||'';
+  $('#sCompOn').checked=s.compactionEnabled; $('#sCompDays').value=s.compactionDays;
+  dlg.showModal();
+});
+$('#dlgCancel').addEventListener('click', ()=>dlg.close());
+$('#dlgSave').addEventListener('click', async () => {
+  const body = {
+    lowThresholdPsi:+$('#sLow').value, dropDeltaPsi:+$('#sDelta').value,
+    dropWindowMinutes:+$('#sWindow').value, offlineTimeoutMinutes:+$('#sOffline').value,
+    cooldownMinutes:+$('#sCooldown').value, telegramEnabled:$('#sTgOn').checked,
+    telegramBotToken:$('#sTgToken').value, telegramChatId:$('#sTgChat').value,
+    displayUnit:$('#sUnit').value, compactionEnabled:$('#sCompOn').checked,
+    compactionDays:+$('#sCompDays').value
+  };
+  state.settings = await api('/settings', {method:'PUT', body:JSON.stringify(body)});
+  dlg.close();
+  await refreshStatus(); await refreshChart();
+});
+
+/* ---------- boot ---------- */
+async function boot(){
+  try {
+    state.settings = await api('/settings');
+    await Promise.all([refreshStatus(), refreshChart(), refreshAlerts()]);
+    clearInterval(state.timer);
+    state.timer = setInterval(() => { refreshStatus(); refreshAlerts(); }, 60_000);
+  } catch(e){ /* 401 already routed to login */ }
+}
+boot();
+</script>
+</body>
+</html>

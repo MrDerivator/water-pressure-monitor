@@ -1,0 +1,13 @@
+package com.watermonitor.config;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
+@ConfigurationProperties(prefix = "app")
+public record AppProperties(
+        String dashboardPassword,
+        String deviceApiKey,
+        String deviceName,
+        Telegram telegram
+) {
+    public record Telegram(boolean enabled, String botToken, String chatId) {}
+}
