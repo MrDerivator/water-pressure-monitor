@@ -43,13 +43,20 @@ public class MeasurementService {
 
     @Transactional(readOnly = true)
     public SeriesResponse series(Long deviceId, String granularity, OffsetDateTime from, OffsetDateTime to) {
+        Map<OffsetDateTime, Bucket> merged = new TreeMap<>();
+
+        if ("day".equals(granularity)) {
+            // Every individual 2-min reading, plus any already-compacted hours for older data.
+            for (Object[] row : measurements.aggregateHourly(deviceId, "hour", from, to)) put(merged, row, true);
+            for (Object[] row : measurements.rawPoints(deviceId, from, to)) put(merged, row, false);
+            return new SeriesResponse(granularity, new ArrayList<>(merged.values()));
+        }
+
         String unit = switch (granularity) {
-            case "day" -> "hour";    // day view  -> hourly points
             case "month" -> "day";   // month view -> daily points
             case "year" -> "month";  // year view -> monthly points
             default -> throw new IllegalArgumentException("granularity must be day|month|year");
         };
-        Map<OffsetDateTime, Bucket> merged = new TreeMap<>();
         for (Object[] row : measurements.aggregateHourly(deviceId, unit, from, to)) put(merged, row, true);
         for (Object[] row : measurements.aggregateRaw(deviceId, unit, from, to)) put(merged, row, false);
         return new SeriesResponse(granularity, new ArrayList<>(merged.values()));
