@@ -19,9 +19,21 @@ public interface MeasurementRepository extends JpaRepository<Measurement, Long> 
             """, nativeQuery = true)
     BigDecimal maxPressureSince(@Param("deviceId") Long deviceId, @Param("since") OffsetDateTime since);
 
-    /** Aggregate raw measurements into date_trunc buckets. unit: 'hour' | 'day' | 'month' */
+    /** Individual raw readings, unaggregated -- used for the Day view so every 2-min reading shows. */
     @Query(value = """
-            SELECT date_trunc(:unit, measured_at) AS bucket,
+            SELECT measured_at AS bucket, pressure_psi AS avg_psi,
+                   pressure_psi AS min_psi, pressure_psi AS max_psi, 1 AS samples
+            FROM measurement
+            WHERE device_id = :deviceId AND measured_at >= :from AND measured_at < :to
+            ORDER BY measured_at
+            """, nativeQuery = true)
+    List<Object[]> rawPoints(@Param("deviceId") Long deviceId,
+                             @Param("from") OffsetDateTime from,
+                             @Param("to") OffsetDateTime to);
+
+    /** Aggregate raw measurements into date_trunc buckets. unit: 'day' | 'month' (used for Month/Year views) */
+    @Query(value = """
+            SELECT date_trunc(CAST(:unit AS text), measured_at) AS bucket,
                    AVG(pressure_psi)  AS avg_psi,
                    MIN(pressure_psi)  AS min_psi,
                    MAX(pressure_psi)  AS max_psi,
@@ -36,9 +48,9 @@ public interface MeasurementRepository extends JpaRepository<Measurement, Long> 
                                 @Param("from") OffsetDateTime from,
                                 @Param("to") OffsetDateTime to);
 
-    /** Same aggregation over the compacted hourly table (weighted average). */
+    /** Same aggregation over the compacted hourly table (weighted average). unit: 'hour' | 'day' | 'month' */
     @Query(value = """
-            SELECT date_trunc(:unit, hour_start) AS bucket,
+            SELECT date_trunc(CAST(:unit AS text), hour_start) AS bucket,
                    SUM(avg_pressure_psi * sample_count) / NULLIF(SUM(sample_count), 0) AS avg_psi,
                    MIN(min_pressure_psi) AS min_psi,
                    MAX(max_pressure_psi) AS max_psi,
