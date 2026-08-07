@@ -15,6 +15,7 @@ spring:
 
 app:
   dashboard-password: ${APP_DASHBOARD_PASSWORD:changeme}
+  viewer-password: ${APP_VIEWER_PASSWORD:}
   device-api-key: ${APP_DEVICE_API_KEY:dev-key-change-me}
   device-name: ${APP_DEVICE_NAME:Main water line}
   telegram:
