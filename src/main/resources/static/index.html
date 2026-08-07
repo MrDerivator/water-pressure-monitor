@@ -358,6 +358,9 @@ $('#dlgSave').addEventListener('click', async () => {
 /* ---------- boot ---------- */
 async function boot(){
   try {
+    const me = await api('/me');
+    state.role = me.role;
+    $('#settingsBtn').hidden = state.role !== 'ADMIN';
     state.settings = await api('/settings');
     await Promise.all([refreshStatus(), refreshChart(), refreshAlerts()]);
     clearInterval(state.timer);

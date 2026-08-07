@@ -23,12 +23,27 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest body, HttpServletRequest req) {
-        if (body == null || body.password() == null || !constantTimeEquals(body.password(), props.dashboardPassword())) {
+        String submitted = body == null ? null : body.password();
+        if (submitted == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Wrong password"));
         }
+
+        String role = null;
+        if (constantTimeEquals(submitted, props.dashboardPassword())) {
+            role = SecurityFilter.ROLE_ADMIN;
+        } else if (props.viewerPassword() != null && !props.viewerPassword().isBlank()
+                && constantTimeEquals(submitted, props.viewerPassword())) {
+            role = SecurityFilter.ROLE_VIEWER;
+        }
+
+        if (role == null) {
+            return ResponseEntity.status(401).body(Map.of("error", "Wrong password"));
+        }
+
         HttpSession session = req.getSession(true);
         session.setAttribute(SecurityFilter.SESSION_AUTH, Boolean.TRUE);
-        return ResponseEntity.ok(Map.of("ok", true));
+        session.setAttribute(SecurityFilter.SESSION_ROLE, role);
+        return ResponseEntity.ok(Map.of("ok", true, "role", role));
     }
 
     @PostMapping("/logout")
@@ -39,15 +54,18 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public Map<String, Boolean> me() {
-        // reaching here means the SecurityFilter accepted the session
-        return Map.of("authed", true);
+    public Map<String, Object> me(HttpServletRequest req) {
+        HttpSession session = req.getSession(false);
+        String role = session != null ? (String) session.getAttribute(SecurityFilter.SESSION_ROLE) : null;
+        // sessions created before this change won't have a role yet -- default them to ADMIN
+        return Map.of("authed", true, "role", role != null ? role : SecurityFilter.ROLE_ADMIN);
     }
 
     @GetMapping("/health")
     public Map<String, String> health() { return Map.of("status", "up"); }
 
     private static boolean constantTimeEquals(String a, String b) {
+        if (a == null || b == null) return false;
         return MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
     }
 }

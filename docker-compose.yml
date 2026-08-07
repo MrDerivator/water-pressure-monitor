@@ -28,7 +28,8 @@ services:
       JDBC_DATABASE_URL: jdbc:postgresql://postgres:5432/watermonitor
       JDBC_DATABASE_USERNAME: watermonitor
       JDBC_DATABASE_PASSWORD: watermonitor
-      APP_DASHBOARD_PASSWORD: changeme
+      APP_DASHBOARD_PASSWORD: admin
+      APP_VIEWER_PASSWORD: viewer
       APP_DEVICE_API_KEY: local-dev-key
       APP_DEVICE_NAME: "Local test device"
       # Telegram off by default for local testing -- flip to true and add

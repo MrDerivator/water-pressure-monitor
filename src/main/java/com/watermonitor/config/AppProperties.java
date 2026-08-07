@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "app")
 public record AppProperties(
         String dashboardPassword,
+        String viewerPassword,
         String deviceApiKey,
         String deviceName,
         Telegram telegram

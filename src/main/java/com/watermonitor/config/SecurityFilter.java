@@ -15,12 +15,19 @@ import java.io.IOException;
  * Two auth schemes:
  *  - POST /api/measurements: X-Api-Key header must match a registered device (ESP32 ingestion)
  *  - all other /api/**: dashboard session (set by POST /api/login), except /api/login and /api/health
+ *
+ * Two dashboard roles:
+ *  - ADMIN  : full access, including PUT /api/settings
+ *  - VIEWER : read-only -- PUT /api/settings is blocked here, server-side, regardless of the UI
  */
 @Component
 public class SecurityFilter extends OncePerRequestFilter {
 
     public static final String DEVICE_ID_ATTR = "authenticatedDeviceId";
     public static final String SESSION_AUTH = "authed";
+    public static final String SESSION_ROLE = "role";
+    public static final String ROLE_ADMIN = "ADMIN";
+    public static final String ROLE_VIEWER = "VIEWER";
 
     private final DeviceRepository devices;
 
@@ -47,11 +54,22 @@ public class SecurityFilter extends OncePerRequestFilter {
         HttpSession session = req.getSession(false);
         boolean authed = session != null && Boolean.TRUE.equals(session.getAttribute(SESSION_AUTH));
         if (!authed) { unauthorized(res, "Login required"); return; }
+
+        String role = (String) session.getAttribute(SESSION_ROLE);
+        boolean isSettingsWrite = path.equals("/api/settings") && "PUT".equalsIgnoreCase(req.getMethod());
+        if (isSettingsWrite && !ROLE_ADMIN.equals(role)) { forbidden(res, "Admin access required"); return; }
+
         chain.doFilter(req, res);
     }
 
     private void unauthorized(HttpServletResponse res, String msg) throws IOException {
         res.setStatus(401);
+        res.setContentType("application/json");
+        res.getWriter().write("{\"error\":\"" + msg + "\"}");
+    }
+
+    private void forbidden(HttpServletResponse res, String msg) throws IOException {
+        res.setStatus(403);
         res.setContentType("application/json");
         res.getWriter().write("{\"error\":\"" + msg + "\"}");
     }
