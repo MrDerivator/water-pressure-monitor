@@ -18,6 +18,8 @@ app:
   viewer-password: ${APP_VIEWER_PASSWORD:}
   device-api-key: ${APP_DEVICE_API_KEY:dev-key-change-me}
   device-name: ${APP_DEVICE_NAME:Main water line}
+  tank-device-api-key: ${APP_TANK_DEVICE_API_KEY:}
+  tank-device-name: ${APP_TANK_DEVICE_NAME:Water tank}
   telegram:
     enabled: ${TELEGRAM_ENABLED:false}
     bot-token: ${TELEGRAM_BOT_TOKEN:}

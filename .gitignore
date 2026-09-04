@@ -3,4 +3,5 @@ target/
 .idea/
 .vscode/
 .DS_Store
-arduino/pressure_sensor/secrets.h
+arduino/water_pressure_monitor/secrets.h
+arduino/water_level_sensor/secrets.h

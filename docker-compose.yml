@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: watermonitor
       POSTGRES_PASSWORD: watermonitor
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -32,6 +32,8 @@ services:
       APP_VIEWER_PASSWORD: viewer
       APP_DEVICE_API_KEY: local-dev-key
       APP_DEVICE_NAME: "Local test device"
+      APP_TANK_DEVICE_API_KEY: local-tank-key
+      APP_TANK_DEVICE_NAME: "Local test tank"
       # Telegram off by default for local testing -- flip to true and add
       # TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID here if you want to test alerts locally.
       TELEGRAM_ENABLED: "false"
