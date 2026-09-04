@@ -45,10 +45,12 @@ public class MeasurementController {
         return service.status(resolveDevice(deviceId));
     }
 
-    /** Single-device convenience: when no deviceId given, use the first registered device. */
+    /**
+     * Single-device convenience: when no deviceId given, use the first registered device.
+     */
     private Long resolveDevice(Long deviceId) {
         if (deviceId != null) return deviceId;
-        return devices.findAll().stream().findFirst()
-                .orElseThrow(() -> new IllegalStateException("No device registered")).getId();
+        return devices.findByDeviceType("PRESSURE").stream().findFirst()
+                .orElseThrow(() -> new IllegalStateException("No pressure device registered")).getId();
     }
 }

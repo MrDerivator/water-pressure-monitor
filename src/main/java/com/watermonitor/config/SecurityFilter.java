@@ -41,7 +41,7 @@ public class SecurityFilter extends OncePerRequestFilter {
         if (!path.startsWith("/api/")) { chain.doFilter(req, res); return; }
         if (path.equals("/api/login") || path.equals("/api/health")) { chain.doFilter(req, res); return; }
 
-        if (path.equals("/api/measurements") && "POST".equalsIgnoreCase(req.getMethod())) {
+        if ((path.equals("/api/measurements") || path.equals("/api/water-level")) && "POST".equalsIgnoreCase(req.getMethod())) {
             String key = req.getHeader("X-Api-Key");
             if (key == null || key.isBlank()) { unauthorized(res, "Missing X-Api-Key"); return; }
             var device = devices.findByApiKey(key);

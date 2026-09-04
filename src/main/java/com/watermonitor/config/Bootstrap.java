@@ -9,12 +9,6 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * First-startup seeding:
- *  - registers the initial device with the API key from APP_DEVICE_API_KEY
- *  - seeds alert settings (incl. Telegram credentials from env); afterwards the DB row
- *    is the source of truth and is editable from the dashboard (owner-confirmed approach)
- */
 @Configuration
 public class Bootstrap {
 
@@ -27,8 +21,18 @@ public class Bootstrap {
                 Device d = new Device();
                 d.setName(props.deviceName());
                 d.setApiKey(props.deviceApiKey());
+                d.setDeviceType("PRESSURE");
                 devices.save(d);
-                log.info("Bootstrap: registered initial device '{}'", props.deviceName());
+                log.info("Bootstrap: registered initial pressure device '{}'", props.deviceName());
+            }
+            if (props.tankDeviceApiKey() != null && !props.tankDeviceApiKey().isBlank()
+                    && devices.findByDeviceType("TANK_LEVEL").isEmpty()) {
+                Device tank = new Device();
+                tank.setName(props.tankDeviceName());
+                tank.setApiKey(props.tankDeviceApiKey());
+                tank.setDeviceType("TANK_LEVEL");
+                devices.save(tank);
+                log.info("Bootstrap: registered tank level device '{}'", props.tankDeviceName());
             }
             settings.seedIfEmpty(props);
         };

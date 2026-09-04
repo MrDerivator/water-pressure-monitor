@@ -8,7 +8,10 @@ public record AppProperties(
         String viewerPassword,
         String deviceApiKey,
         String deviceName,
+        String tankDeviceApiKey,
+        String tankDeviceName,
         Telegram telegram
 ) {
-    public record Telegram(boolean enabled, String botToken, String chatId) {}
+    public record Telegram(boolean enabled, String botToken, String chatId) {
+    }
 }

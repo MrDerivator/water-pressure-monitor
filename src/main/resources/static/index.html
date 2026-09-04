@@ -92,6 +92,11 @@
     .thresh{border-left:none;padding-left:0}
   }
   @media (prefers-reduced-motion: reduce){ *{transition:none !important;animation:none !important} }
+
+  /* ---- tank bar ---- */
+  .tankbar{position:relative;width:70px;height:180px;flex:none;border-radius:10px;background:var(--line2);overflow:hidden;border:1px solid var(--line2)}
+  .tankbar-fill{position:absolute;bottom:0;left:0;right:0;height:0%;background:linear-gradient(180deg,var(--aqua),var(--aqua-dim));transition:height .6s ease}
+  .tankbar-pct{position:relative;z-index:1;height:100%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:20px;font-weight:600;color:#eafcff;text-shadow:0 1px 3px rgba(0,0,0,.5)}
 </style>
 </head>
 <body>
@@ -130,6 +135,17 @@
       <div class="sub"><span class="dot" id="statusDot"></span><span id="statusText">Loading…</span></div>
     </div>
     <div class="thresh" id="threshInfo"></div>
+  </section>
+
+  <section class="now" id="tankSection" hidden>
+    <div class="tankbar">
+      <div class="tankbar-fill" id="tankFill"></div>
+      <div class="tankbar-pct" id="tankPct">—</div>
+    </div>
+    <div class="reading">
+      <div class="val"><span id="tankDeviceName" style="font-size:20px">Spremnik vode</span></div>
+      <div class="sub"><span class="dot" id="tankStatusDot"></span><span id="tankStatusText">Loading…</span></div>
+    </div>
   </section>
 
   <section class="panel">
@@ -242,6 +258,21 @@ async function refreshStatus(){
       `Drop alert &gt; <b>${conv(s.dropDeltaPsi)} ${unit()}</b> / ${s.dropWindowMinutes} min<br>` +
       `Offline after <b>${s.offlineTimeoutMinutes} min</b>`;
   }
+}
+
+/* ---------- refrech tank ---------- */
+async function refreshTank(){
+  const t = await api('/water-level');
+  if (!t.deviceId) { $('#tankSection').hidden = true; return; }
+  $('#tankSection').hidden = false;
+  $('#tankDeviceName').textContent = t.deviceName;
+  const pct = t.levelPercent != null ? Math.round(t.levelPercent) : null;
+  $('#tankFill').style.height = (pct ?? 0) + '%';
+  $('#tankPct').textContent = pct != null ? pct + '%' : '—';
+  $('#tankStatusDot').className = 'dot ' + (t.online ? 'on':'off');
+  $('#tankStatusText').textContent = t.lastMeasuredAt
+          ? (t.online?'Online':'Offline') + ' · ' + new Date(t.lastMeasuredAt).toLocaleString()
+          : 'Waiting for first reading';
 }
 
 /* ---------- history chart ---------- */
@@ -362,9 +393,9 @@ async function boot(){
     state.role = me.role;
     $('#settingsBtn').hidden = state.role !== 'ADMIN';
     state.settings = await api('/settings');
-    await Promise.all([refreshStatus(), refreshChart(), refreshAlerts()]);
+    await Promise.all([refreshStatus(), refreshChart(), refreshAlerts(), refreshTank()]);
     clearInterval(state.timer);
-    state.timer = setInterval(() => { refreshStatus(); refreshAlerts(); }, 60_000);
+    state.timer = setInterval(() => { refreshStatus(); refreshAlerts(); refreshTank(); }, 60_000);
   } catch(e){ /* 401 already routed to login */ }
 }
 boot();
